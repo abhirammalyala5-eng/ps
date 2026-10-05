@@ -1,0 +1,100 @@
+Data Sources and Datasets Used in the Final Combined File
+========================================================
+
+Final combined file: ingredient_datasets/complete_dataset.csv
+The list below is taken from the source provenance recorded for the combined ingredient data.
+
+Source: United States Department of Agriculture (USDA)
+Dataset: FoodData Central — Foundation Foods 2026
+Link: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2026-04-30.zip
+
+Source: United States Department of Agriculture (USDA)
+Dataset: FoodData Central — SR Legacy 2018
+Link: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+
+Source: Food Standards Australia New Zealand (FSANZ)
+Dataset: AUSNUT 2023 — Food nutrient profiles
+Link: https://www.foodstandards.gov.au/sites/default/files/2025-09/AUSNUT%202023%20-%20Food%20nutrient%20profiles.xlsx?v=20250903
+Dataset page: https://www.foodstandards.gov.au/science-data/food-nutrient-databases/ausnut/data-files
+
+Source: Food Standards Australia New Zealand (FSANZ)
+Dataset: Australian Food Composition Database — Release 3, nutrient profiles
+Link: https://www.foodstandards.gov.au/sites/default/files/2025-12/AFCD%20Release%203%20-%20Nutrient%20profiles.xlsx
+Dataset page: https://www.foodstandards.gov.au/science-data/food-nutrient-databases/afcd/data-files
+
+Source: New Zealand Institute for Plant & Food Research
+Dataset: New Zealand Food Composition Database — Concise tables, 14th edition (2021)
+Link: https://www.foodcomposition.co.nz/downloads/concise-14-edition.xlsx
+
+Source: ANSES (France)
+Dataset: Ciqual French Food Composition Table 2025
+Link: https://entrepot.recherche.data.gouv.fr/api/access/datafile/666260
+Dataset page: https://ciqual.anses.fr/cms/en/2025-anses-ciqual-table
+
+Source: Swiss Federal Food Safety and Veterinary Office (BLV/OSAV)
+Dataset: Swiss Food Composition Database, version 7.1
+Link: https://naehrwertdaten.ch/wp-content/uploads/2026/07/Swiss_food_composition_database.xlsx
+
+Source: UK Department of Health and Social Care
+Dataset: Composition of Foods Integrated Dataset (CoFID) 2021
+Link: https://assets.publishing.service.gov.uk/media/60538b91e90e07527df82ae4/McCance_Widdowsons_Composition_of_Foods_Integrated_Dataset_2021..xlsx
+
+Source: UK Department of Health and Social Care
+Dataset: CoFID Old Foods
+Link: https://assets.publishing.service.gov.uk/media/60538ba4e90e07527f645f88/CoFID_oldFoods.xlsx
+
+Source: India National Institute of Nutrition (NIN)
+Dataset: India NIN / IFCT 2017
+Link: https://raw.githubusercontent.com/vikx01/Indian-Nutrient-Databank-INDB/master/NIN_fct.xlsx
+
+Source: Food and Agriculture Organization of the United Nations (FAO)
+Dataset: West African Food Composition Table (WAFCT) 2019
+Link: https://www.fao.org/fileadmin/user_upload/faoweb/2020/WAFCT_2019.xlsx
+
+Source: FAO/INFOODS
+Dataset: uFiSh 1.0
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/uFiSh1.0.xlsx
+
+Source: FAO/INFOODS
+Dataset: PulsesDM 1.0
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/PulsesDM1.0.xlsx
+
+Source: FAO/INFOODS
+Dataset: uPulses 1.0
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/uPulses1.0.xlsx
+
+Source: FAO/INFOODS
+Dataset: BioFoodComp 4.0
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/BioFoodComp4.0.xlsx
+
+Source: FAO/INFOODS
+Dataset: AnFooD 2.0
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/AnFooD2.0.xlsx
+
+Source: FAO/INFOODS Bangladesh
+Dataset: Bangladesh Food Composition Table 2013
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCDB_7_4_14.xlsx
+
+Source: FAO/INFOODS SMILING project
+Dataset: Cambodia Food Composition Table
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCT_SMILING_PROJECT_ASIA/D3_5a_SMILING_FCT__Cambodia_010813_protected.xlsx
+
+Source: FAO/INFOODS SMILING project
+Dataset: Indonesia Food Composition Table 2013
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCT_SMILING_PROJECT_ASIA/D3_5a_SMILING_FCT_Indonesia_070813_protected.xlsx
+
+Source: FAO/INFOODS SMILING project
+Dataset: Laos Food Composition Table 2013
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCT_SMILING_PROJECT_ASIA/D3_5a_SMILING_FCT_Laos_010813_protected.xlsx
+
+Source: FAO/INFOODS SMILING project
+Dataset: Thailand Food Composition Table
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCT_SMILING_PROJECT_ASIA/D3_5a_SMILING_FCT_Thailand_150513_protected.xlsx
+
+Source: FAO/INFOODS SMILING project
+Dataset: Vietnam Food Composition Table
+Link: https://www.fao.org/fileadmin/templates/food_composition/documents/FCT_SMILING_PROJECT_ASIA/D3_5a_SMILING_FCT_Vietnam_180713_protected.xlsx
+
+Source: Japan Ministry of Education, Culture, Sports, Science and Technology (MEXT)
+Dataset: Standard Tables of Food Composition in Japan 2015
+Link: https://www.mext.go.jp/component/english/__icsFiles/afieldfile/2017/12/25/1374049_1r12_1.xlsx
