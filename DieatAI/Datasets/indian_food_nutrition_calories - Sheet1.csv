@@ -1,0 +1,107 @@
+Food_Item,Category,Calories_per_100g,Protein_g,Fat_g,Carbs_g,Fiber_g,Sugar_g,Sodium_mg,Potassium_mg,Vitamin_C_mg,Calcium_mg,Iron_mg,Spice_Level,Cooking_Method,Region
+Dal Tadka,Lentils,120,7,4,18,8,2,400,250,5,30,2,Medium,Pressure Cook,North
+Butter Chicken,Non-Veg,280,25,20,5,1,3,600,350,8,40,15,Medium,Grill,North
+Palak Paneer,Veg,220,14,18,8,4,2,450,200,25,200,12,Mild,Sauté,North
+Chicken Biryani,Non-Veg,320,28,15,35,2,5,800,400,10,60,18,Spicy,Dum,South
+Aloo Gobi,Veg,140,3,10,15,5,3,300,150,30,25,8,Mild,Sauté,North
+Masoor Dal,Lentils,110,8,2,19,7,1,350,280,2,25,3,Medium,Boil,North
+Fish Curry,Non-Veg,180,22,8,6,1,2,700,380,15,45,20,Spicy,Curry,South
+Chole Bhature,Veg,380,12,22,45,8,6,900,200,12,80,25,Medium,Deep Fry,North
+Tandoori Chicken,Non-Veg,240,30,12,3,0,1,650,420,20,35,25,Spicy,Grill,North
+Vegetable Pulao,Veg,200,5,8,32,3,4,500,180,15,35,10,Mild,Steam,North
+Rajma,Lentils,130,8,3,21,9,2,400,300,4,40,4,Medium,Pressure Cook,North
+Baingan Bharta,Veg,100,2,7,12,6,5,250,120,8,20,6,Medium,Roast,North
+Chicken Tikka,Non-Veg,220,26,10,4,1,2,580,380,18,45,22,Spicy,Grill,North
+Paneer Tikka,Veg,260,18,20,6,2,3,480,220,12,180,15,Mild,Grill,North
+Dosa,Snacks,180,4,8,28,3,1,400,150,2,20,8,Mild,Pan Fry,South
+Idli,Snacks,120,6,2,25,4,1,200,80,1,15,2,Mild,Steam,South
+Vada,Snacks,220,8,15,20,3,2,450,120,3,25,12,Medium,Deep Fry,South
+Samosa,Snacks,260,6,16,28,3,3,600,140,15,30,15,Mild,Deep Fry,North
+Pakora,Snacks,240,8,18,22,4,2,550,130,20,35,18,Medium,Deep Fry,North
+Kheer,Dessert,220,6,12,30,1,20,180,120,2,120,8,Mild,Simmer,North
+Gulab Jamun,Dessert,350,5,15,55,2,35,120,80,5,60,12,Mild,Deep Fry,North
+Rasgulla,Dessert,180,4,2,40,0,35,80,60,8,80,2,Mild,Boil,East
+Jalebi,Dessert,320,4,12,60,1,45,200,90,3,45,15,Mild,Deep Fry,North
+Roti,Bread,270,9,4,50,8,2,380,180,0,25,2,Mild,Pan Cook,North
+Naan,Bread,310,10,6,55,3,4,420,200,1,30,3,Mild,Tandoor,North
+Paratha,Bread,320,8,18,42,5,3,600,220,2,35,4,Mild,Pan Fry,North
+Puri,Bread,340,8,20,38,3,2,450,160,0,20,6,Mild,Deep Fry,North
+Bhatura,Bread,380,10,22,42,4,3,700,180,1,25,8,Mild,Deep Fry,North
+Upma,Breakfast,180,6,8,28,4,2,350,120,5,25,8,Mild,Sauté,South
+Poha,Breakfast,160,4,6,30,3,4,280,100,8,20,6,Mild,Sauté,West
+Dhokla,Snacks,140,8,4,24,2,6,320,140,2,15,4,Mild,Steam,West
+Khandvi,Snacks,120,10,6,18,2,3,380,160,1,25,5,Mild,Steam,West
+Thepla,Bread,280,12,16,32,6,4,520,200,3,45,8,Medium,Pan Fry,West
+Khakhra,Bread,320,14,12,48,8,2,450,180,2,35,6,Mild,Roast,West
+Handvo,Snacks,220,12,10,28,5,5,420,160,8,40,12,Mild,Bake,West
+Muthia,Snacks,180,8,12,20,8,4,380,140,12,30,10,Mild,Steam,West
+Undhiyu,Veg,160,5,8,20,6,8,320,180,25,35,15,Mild,Steam,West
+Kadhi,Veg,120,6,6,14,2,4,280,120,5,80,3,Mild,Simmer,West
+Shrikhand,Dessert,240,8,12,32,0,28,120,100,2,150,4,Mild,Chill,West
+Basundi,Dessert,260,10,14,28,0,25,140,120,1,180,6,Mild,Simmer,West
+Pav Bhaji,Veg,240,8,12,32,6,8,680,220,45,40,12,Medium,Sauté,West
+Misal Pav,Veg,200,12,8,24,8,6,720,280,35,60,18,Spicy,Curry,West
+Vada Pav,Snacks,280,10,18,26,4,4,650,160,15,35,15,Medium,Deep Fry,West
+Bhel Puri,Snacks,160,4,6,28,4,12,480,140,20,25,8,Mild,Mix,West
+Sev Puri,Snacks,220,6,14,24,3,8,520,120,18,30,10,Medium,Mix,West
+Ragda Patties,Snacks,200,8,10,26,6,6,580,160,25,40,12,Medium,Sauté,West
+Sabudana Khichdi,Breakfast,180,4,6,32,2,4,240,80,3,15,4,Mild,Sauté,West
+Thalipeeth,Bread,260,12,14,30,8,3,420,180,5,45,10,Medium,Pan Fry,West
+Kolambi Bhaat,Non-Veg,220,18,8,28,2,2,520,320,8,35,15,Medium,Steam,West
+Kombdi Vade,Non-Veg,280,22,16,24,3,1,580,380,12,45,20,Spicy,Deep Fry,West
+Malvani Fish,Non-Veg,200,24,10,6,1,1,640,420,18,50,25,Spicy,Curry,West
+Sol Kadhi,Veg,60,2,4,8,2,6,180,200,15,40,2,Mild,Simmer,West
+Amti,Lentils,110,7,3,17,6,2,320,240,3,30,3,Medium,Boil,West
+Puran Poli,Bread,300,8,12,48,6,18,280,140,2,25,8,Mild,Pan Fry,West
+Modak,Dessert,280,6,14,38,3,22,160,100,5,35,8,Mild,Steam,West
+Karanji,Dessert,320,8,18,40,4,25,180,120,8,40,10,Mild,Deep Fry,West
+Chirote,Dessert,340,6,20,42,2,28,200,90,1,30,12,Mild,Deep Fry,West
+Appam,Bread,180,4,6,32,3,4,280,120,1,20,6,Mild,Pan Fry,South
+Puttu,Bread,200,6,8,30,4,2,320,140,2,25,8,Mild,Steam,South
+Kappa,Breakfast,160,2,4,36,4,2,240,520,25,30,8,Mild,Boil,South
+Meen Curry,Non-Veg,190,23,9,5,1,1,680,440,20,55,28,Spicy,Curry,South
+Meen Pollichathu,Non-Veg,210,25,11,4,1,1,620,460,18,48,22,Spicy,Wrap,South
+Kozhi Curry,Non-Veg,250,28,14,3,0,1,590,410,15,42,20,Spicy,Curry,South
+Egg Curry,Non-Veg,170,14,12,4,1,1,520,280,8,65,18,Medium,Curry,South
+Avial,Veg,140,4,10,12,6,4,380,220,35,45,12,Mild,Steam,South
+Kaalan,Veg,120,3,8,14,5,6,340,180,20,55,8,Mild,Simmer,South
+Thoran,Veg,160,6,12,14,8,4,420,240,25,40,15,Mild,Sauté,South
+Olan,Veg,100,2,6,12,4,5,280,160,15,35,6,Mild,Simmer,South
+Erissery,Veg,150,5,10,14,7,3,360,200,30,50,18,Mild,Boil,South
+Kootu Curry,Veg,180,8,12,16,9,4,440,260,40,60,25,Mild,Sauté,South
+Inji Curry,Veg,80,1,4,10,2,8,420,120,8,25,4,Spicy,Simmer,South
+Mango Pickle,Condiment,120,1,8,12,4,8,1800,80,25,15,8,Spicy,Ferment,South
+Lemon Pickle,Condiment,100,1,6,14,3,10,1600,60,35,12,6,Spicy,Ferment,South
+Puli Inji,Condiment,90,1,5,12,3,15,1400,90,20,18,5,Spicy,Simmer,South
+Mutton Curry,Non-Veg,270,26,18,4,1,2,720,380,12,35,22,Spicy,Curry,South
+Mutton Biryani,Non-Veg,330,25,20,35,3,6,850,420,8,55,20,Spicy,Dum,South
+Hyderabadi Biryani,Non-Veg,340,27,19,36,2,5,880,440,9,58,22,Spicy,Dum,South
+Kolkata Biryani,Non-Veg,310,24,16,38,4,8,780,380,12,45,18,Mild,Dum,East
+Lucknowi Biryani,Non-Veg,320,26,17,37,3,6,820,400,10,52,19,Mild,Dum,North
+Keema,Veg,240,20,16,8,3,4,680,320,6,40,15,Medium,Sauté,North
+Seekh Kebab,Non-Veg,260,24,18,3,1,2,750,360,8,38,18,Spicy,Grill,North
+Shami Kebab,Non-Veg,250,22,16,6,2,3,720,340,10,45,16,Medium,Shallow Fry,North
+Galouti Kebab,Non-Veg,280,23,22,4,1,2,780,380,5,35,20,Medium,Grill,North
+Reshmi Kebab,Non-Veg,270,26,20,2,0,1,680,420,3,42,22,Mild,Grill,North
+Chicken Korma,Non-Veg,290,28,22,6,2,3,820,360,12,48,25,Mild,Simmer,North
+Navratan Korma,Veg,200,6,16,18,5,12,480,220,20,65,15,Mild,Simmer,North
+Malai Kofta,Veg,240,8,18,20,4,8,520,180,15,55,12,Mild,Deep Fry,North
+Shahi Paneer,Veg,280,14,22,12,3,6,560,240,18,220,18,Mild,Simmer,North
+Kadai Paneer,Veg,260,16,20,10,4,5,620,280,25,180,20,Medium,Sauté,North
+Matar Paneer,Veg,240,15,18,14,5,6,580,260,20,165,16,Medium,Simmer,North
+Palak Chicken,Non-Veg,260,29,16,8,4,3,640,380,35,55,22,Medium,Sauté,North
+Chicken Chettinad,Non-Veg,280,31,18,7,3,2,980,420,18,45,28,Spicy,Curry,South
+Andhra Chicken,Non-Veg,290,30,19,8,2,3,1050,440,15,42,25,Spicy,Curry,South
+Chicken 65,Non-Veg,300,28,20,9,1,4,920,380,12,38,24,Spicy,Deep Fry,South
+Chili Chicken,Non-Veg,270,26,16,12,2,8,780,360,45,48,20,Spicy,Sauté,North
+Chicken Manchurian,Non-Veg,280,25,18,14,3,10,820,340,35,42,22,Spicy,Deep Fry,North
+Gobi Manchurian,Veg,220,6,16,20,5,12,680,180,40,35,15,Spicy,Deep Fry,North
+Paneer Manchurian,Veg,260,16,20,16,4,10,720,220,25,165,18,Spicy,Deep Fry,North
+Spring Roll,Snacks,200,8,12,24,3,6,580,140,15,25,12,Mild,Deep Fry,North
+Momos,Snacks,180,12,8,20,2,3,520,220,8,35,15,Mild,Steam,North
+Thukpa,Snacks,120,8,4,16,2,2,480,180,12,25,8,Mild,Simmer,North
+Chowmein,Veg,220,8,14,28,4,6,620,160,18,30,12,Medium,Sauté,North
+Fried Rice,Veg,240,10,12,32,3,4,580,140,12,28,14,Medium,Sauté,North
+Schezwan Rice,Veg,260,9,16,30,3,8,780,150,25,32,16,Spicy,Sauté,North
+Chicken Fried Rice,Non-Veg,280,18,14,30,2,4,650,180,15,35,18,Medium,Sauté,North
+Egg Fried Rice,Non-Veg,250,14,12,32,3,5,600,160,8,38,16,Medium,Sauté,North
