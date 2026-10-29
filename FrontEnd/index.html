@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <meta name="description"
+          content="Nutra - AI based food nutrition analyzer">
+
+    <title>Nutra - Food Nutrition Analyzer</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    
+    <header class="header">
+
+        <div class="logo">
+            <img src="images/logo.png.jpeg" alt="nutra logo"> 
+           <span>NutriScanAI</span> 
+        </div>
+
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#analyzer">Analyzer</a>
+            <a href="#about">About</a>
+        </nav>
+
+    </header>
+
+
+    
+    <main>
+
+        <!-- Hero Section -->
+        <section id="home" class="hero">
+
+            <h1>AI Food Nutrition Analyzer</h1>
+
+            <p>
+                Upload a food image and discover its nutritional information.
+            </p>
+
+            <a href="#analyzer" class="primary-button">
+                Analyze Food
+            </a>
+
+        </section>
+
+
+        <!-- Analyzer Section -->
+        <section id="analyzer" class="analyzer">
+
+            <div class="analyzer-card">
+
+                <h2>Analyze Your Food</h2>
+
+                <p>
+                    Upload an image of your food to identify it
+                    and view its nutrition information.
+                </p>
+
+
+                <!-- Image Upload -->
+                <div class="upload-area">
+
+                    <label for="foodImage">
+                        📷 Select Food Image
+                    </label>
+
+                    <input
+                        type="file"
+                        id="foodImage"
+                        accept="image/*"
+                    >
+
+                </div>
+
+
+                <!-- Image Preview -->
+                <div id="preview-container">
+
+                    <img
+                        id="imagePreview"
+                        src=""
+                        alt="Food image preview"
+                    >
+
+                </div>
+
+
+                <!-- Analyze Button -->
+                <button
+                    id="analyzeButton"
+                    onclick="analyzeFood()"
+                >
+                    🔍 Analyze Food
+                </button>
+
+
+                <!-- Result -->
+                <div id="result">
+
+                    <h3>Analysis Result</h3>
+
+                    <p>
+                        Upload an image and click
+                        <strong>Analyze Food</strong>.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Nutrition Section -->
+        <section id="nutrition" class="nutrition-section">
+
+            <h2>Nutrition Information</h2>
+
+            <div class="nutrition-grid">
+
+                <div class="nutrition-card">
+                    <h3>🔥 Calories</h3>
+                    <p id="calories">-- kcal</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🍚 Carbohydrates</h3>
+                    <p id="carbohydrates">-- g</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>💪 Protein</h3>
+                    <p id="protein">-- g</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🥑 Fats</h3>
+                    <p id="fats">-- g</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🍬 Free Sugar</h3>
+                    <p id="free-sugar">-- g</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🌾 Fibre</h3>
+                    <p id="fibre">-- g</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🧂 Sodium</h3>
+                    <p id="sodium">-- mg</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🦴 Calcium</h3>
+                    <p id="calcium">-- mg</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🔬 Iron</h3>
+                    <p id="iron">-- mg</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🍊 Vitamin C</h3>
+                    <p id="vitamin-c">-- mg</p>
+                </div>
+
+                <div class="nutrition-card">
+                    <h3>🧬 Folate</h3>
+                    <p id="folate">-- µg</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- About Section -->
+        <section id="about" class="about">
+
+            <h2>About Nutra</h2>
+
+            <p>
+                Nutra is an AI-powered food analysis application
+                designed to identify food from an image and provide
+                nutritional information.
+            </p>
+
+            <div class="process">
+
+                <div>
+                    <span>1</span>
+                    <h3>Upload</h3>
+                    <p>Upload a food image.</p>
+                </div>
+
+                <div>
+                    <span>2</span>
+                    <h3>Analyze</h3>
+                    <p>AI identifies the food.</p>
+                </div>
+
+                <div>
+                    <span>3</span>
+                    <h3>Nutrition</h3>
+                    <p>View nutritional information.</p>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- Footer -->
+    <footer>
+
+        <p>
+            &copy 2026 Nutra. All rights reserved.
+        </p>
+
+    </footer>
+
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
