@@ -56,6 +56,33 @@ $env:DIETAI_CORS_ORIGINS = "http://127.0.0.1:5500,http://localhost:5500"
 
 Keep this setting to the origins you actually use; do not use a wildcard for a deployed site.
 
+
+## Run the frontend locally
+
+Open a second PowerShell terminal from the repository root and serve the static page:
+
+```powershell
+py -m http.server 5500 --directory FrontEnd
+```
+
+Open <http://127.0.0.1:5500>. Keep both the frontend server and the API server running. If your frontend uses another origin, add it to `DIETAI_CORS_ORIGINS` before starting the API.
+
+## Quick checks
+
+With the API running, check the health endpoint:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+```
+
+To check upload validation with a real image, use a path to a JPEG, PNG, or WEBP file:
+
+```powershell
+curl.exe -i -F "image=@C:\path\to\food.jpg" http://127.0.0.1:8000/analyze
+```
+
+A valid image currently returns HTTP 503 by design, with a message explaining that the trained model artifacts have not been connected. Try a non-image file or an image over 10 MB to see the validation errors.
+
 ## Model integration later
 
 Add the colleague's inference code and model files through the project's agreed secure storage process. Do not commit credentials or private access tokens. Before returning predictions, confirm that the image model, preprocessing, regression model, and matching vectorizer are available and that the output fields match the frontend. This scaffold intentionally contains no fallback or sample predictions.
