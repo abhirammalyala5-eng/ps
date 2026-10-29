@@ -1,142 +1,88 @@
-// Get important HTML elements
+// The API can be hosted elsewhere by setting window.DIETAI_API_URL before this file loads.
+const API_BASE_URL = (window.DIETAI_API_URL || "http://127.0.0.1:8000")
+    .replace(/\/+$/, "");
+
 const imageInput = document.getElementById("foodImage");
 const imagePreview = document.getElementById("imagePreview");
+const result = document.getElementById("result");
 
-
-// Show image preview when user selects an image
 imageInput.addEventListener("change", function () {
-
     const file = imageInput.files[0];
 
-    if (file) {
-
-        const imageURL = URL.createObjectURL(file);
-
-        imagePreview.src = imageURL;
-
-        imagePreview.style.display = "block";
-    }
-});
-
-
-// Analyze food
-async function analyzeFood() {
-
-    const result = document.getElementById("result");
-
-    if (imageInput.files.length === 0) {
-
-        result.innerHTML =
-            "<p>Please select a food image first.</p>";
-
+    if (!file) {
+        imagePreview.removeAttribute("src");
+        imagePreview.style.display = "none";
         return;
     }
 
+    if (imagePreview.dataset.objectUrl) {
+        URL.revokeObjectURL(imagePreview.dataset.objectUrl);
+    }
 
-    const image = imageInput.files[0];
+    const imageURL = URL.createObjectURL(file);
+    imagePreview.dataset.objectUrl = imageURL;
+    imagePreview.src = imageURL;
+    imagePreview.style.display = "block";
+});
 
+function showMessage(message) {
+    // Treat server-provided text as text, never as HTML.
+    result.textContent = message;
+}
 
-    // Create form data
+async function analyzeFood() {
+    if (imageInput.files.length === 0) {
+        showMessage("Please select a food image first.");
+        return;
+    }
+
     const formData = new FormData();
-
-    formData.append("image", image);
-
-
-    // Show loading message
-    result.innerHTML =
-        "<p>🤖 Analyzing food... Please wait.</p>";
-
+    formData.append("image", imageInput.files[0]);
+    showMessage("Uploading image for validation...");
 
     try {
+        const response = await fetch(`${API_BASE_URL}/analyze`, {
+            method: "POST",
+            body: formData
+        });
 
-        // Send image to Flask backend
-        const response = await fetch(
-            "http://127.0.0.1:5000/analyze",
-            {
-                method: "POST",
-                body: formData
-            }
-        );
+        const data = await response.json().catch(() => ({}));
 
-
-        const data = await response.json();
-
-
-        // Check backend error
-        if (data.error) {
-
-            result.innerHTML =
-                `<p>${data.error}</p>`;
-
+        if (!response.ok) {
+            showMessage(data.detail || data.error || `Request failed (HTTP ${response.status}).`);
             return;
         }
 
-
-        // Display food result
-        result.innerHTML = `
-            <h3>Food Detected 🍛</h3>
-
-            <p>
-                <strong>Food:</strong>
-                ${data.food}
-            </p>
-
-            <p>
-                <strong>Confidence:</strong>
-                ${data.confidence}%
-            </p>
-        `;
-
-
-        // Display nutrition if available
-        if (data.nutrition) {
-
-            const nutrition = data.nutrition;
-
-
-            document.getElementById("calories").textContent =
-                `${nutrition.calories} kcal`;
-
-            document.getElementById("carbohydrates").textContent =
-                `${nutrition.carbohydrates} g`;
-
-            document.getElementById("protein").textContent =
-                `${nutrition.protein} g`;
-
-            document.getElementById("fats").textContent =
-                `${nutrition.fats} g`;
-
-            document.getElementById("free-sugar").textContent =
-                `${nutrition.free_sugar} g`;
-
-            document.getElementById("fibre").textContent =
-                `${nutrition.fibre} g`;
-
-            document.getElementById("sodium").textContent =
-                `${nutrition.sodium} mg`;
-
-            document.getElementById("calcium").textContent =
-                `${nutrition.calcium} mg`;
-
-            document.getElementById("iron").textContent =
-                `${nutrition.iron} mg`;
-
-            document.getElementById("vitamin-c").textContent =
-                `${nutrition.vitamin_c} mg`;
-
-            document.getElementById("folate").textContent =
-                `${nutrition.folate} µg`;
+        // The current backend scaffold does not return predictions.
+        if (!data.food || !data.nutrition) {
+            showMessage("The API responded, but no food or nutrition prediction was provided.");
+            return;
         }
 
+        showMessage(`Food detected: ${data.food}`);
 
+        const nutrition = data.nutrition;
+        const fields = {
+            calories: [nutrition.calories, "kcal"],
+            carbohydrates: [nutrition.carbohydrates, "g"],
+            protein: [nutrition.protein, "g"],
+            fats: [nutrition.fats, "g"],
+            "free-sugar": [nutrition.free_sugar, "g"],
+            fibre: [nutrition.fibre, "g"],
+            sodium: [nutrition.sodium, "mg"],
+            calcium: [nutrition.calcium, "mg"],
+            iron: [nutrition.iron, "mg"],
+            "vitamin-c": [nutrition.vitamin_c, "mg"],
+            folate: [nutrition.folate, "µg"]
+        };
+
+        for (const [id, [value, unit]] of Object.entries(fields)) {
+            if (value !== undefined && value !== null) {
+                document.getElementById(id).textContent = `${value} ${unit}`;
+            }
+        }
     } catch (error) {
-
-        result.innerHTML = `
-            <p>
-                ❌ Could not connect to Python backend.
-            </p>
-        `;
-
+        showMessage("Could not connect to the DietAI API. Check that the backend is running.");
         console.error(error);
     }
 }
