@@ -1,6 +1,6 @@
 # Food Vision API
 
-FastAPI endpoint that accepts a food photo, runs the bundled YOLO segmentation checkpoint, sends the resized photo and pixel-area summary to Ollama's local Qwen3-VL model, and returns JSON ingredient weight estimates.
+FastAPI endpoint that accepts two photos of the same serving (top-down and side-at-plate-level), runs the bundled YOLO segmentation checkpoint on both views, sends both resized photos and their pixel-area summaries to Ollama's local Qwen3-VL model, and returns JSON ingredient weight estimates. The two views let Qwen use top-view footprint and side-view height to make a volume-informed estimate.
 
 ## Files
 
@@ -28,11 +28,19 @@ $env:YOLO_CONFIG_DIR = "$PWD\.ultralytics"
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/docs` and upload an image to `POST /vision`.
+Open `http://127.0.0.1:8000/docs` and upload both photos to `POST /vision`: `top_image` for a directly overhead photo and `side_image` for a side view at plate level. Both photos must show the same serving.
+
+Or use curl:
+
+```powershell
+curl.exe -X POST http://127.0.0.1:8000/vision `
+  -F "top_image=@C:\path\to\meal-top.jpg" `
+  -F "side_image=@C:\path\to\meal-side.jpg"
+```
 
 ## Response and limitations
 
-The response contains an `ingredients` object with estimated grams and a `segmentation` object with pixel-area summaries. Weights are visual estimates; a single RGB image cannot reveal actual mass without scale/portion reference data.
+The response contains an `ingredients` object with estimated grams and separate top/side segmentation summaries. Two views make volume estimation more credible, but mass is still estimated using likely food density; exact weight requires a scale or a known size reference in the photos.
 
 The bundled checkpoint metadata currently contains only one class (`food`), despite the upstream model card describing 103 classes. It therefore provides food-region masks, not reliable ingredient classification. Qwen identifies food from the image; this segmentation model currently contributes only a coarse area cue.
 

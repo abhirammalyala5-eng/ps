@@ -112,39 +112,56 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "segmenter": "loaded", "qwen_model": QWEN_MODEL}
 
 
-@app.post("/vision")
-async def vision(image: UploadFile = File(...)) -> dict[str, Any]:
-    if image.content_type and not image.content_type.startswith("image/"):
-        raise HTTPException(status_code=415, detail="Upload must be an image")
-    raw = await image.read(MAX_IMAGE_BYTES + 1)
+async def _read_food_image(upload: UploadFile, field_name: str) -> Image.Image:
+    if upload.content_type and not upload.content_type.startswith("image/"):
+        raise HTTPException(status_code=415, detail=f"{field_name} must be an image")
+    raw = await upload.read(MAX_IMAGE_BYTES + 1)
     if not raw:
-        raise HTTPException(status_code=400, detail="Uploaded image is empty")
+        raise HTTPException(status_code=400, detail=f"{field_name} is empty")
     if len(raw) > MAX_IMAGE_BYTES:
-        raise HTTPException(status_code=413, detail=f"Image exceeds {MAX_IMAGE_BYTES} bytes")
+        raise HTTPException(status_code=413, detail=f"{field_name} exceeds {MAX_IMAGE_BYTES} bytes")
     try:
-        pil_image = Image.open(io.BytesIO(raw)).convert("RGB")
+        image = Image.open(io.BytesIO(raw)).convert("RGB")
     except (UnidentifiedImageError, OSError):
-        raise HTTPException(status_code=400, detail="Could not decode uploaded image")
+        raise HTTPException(status_code=400, detail=f"Could not decode {field_name}")
+    if max(image.size) > MAX_SIDE:
+        image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
+    return image
+
+
+@app.post("/vision")
+async def vision(
+    top_image: UploadFile = File(..., description="Photo taken directly above the meal"),
+    side_image: UploadFile = File(..., description="Photo taken from the side at plate level"),
+) -> dict[str, Any]:
+    """Estimate ingredient weights from paired top and side views of one serving."""
+    top = await _read_food_image(top_image, "top_image")
+    side = await _read_food_image(side_image, "side_image")
 
     started = time.perf_counter()
-    if max(pil_image.size) > MAX_SIDE:
-        pil_image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
-    areas, detections = segmentation_summary(pil_image)
+    top_areas, top_detections = segmentation_summary(top)
+    side_areas, side_detections = segmentation_summary(side)
     segmented_at = time.perf_counter()
     prompt = (
-        "Carefully inspect the ENTIRE food image yourself. The image is the source of truth and has "
+        "You are given TWO photos of the SAME serving: image 1 is the top-down view; image 2 is the "
+        "side view at plate level. Use the top view to estimate footprint and the side view to estimate "
+        "food height/volume. Cross-check the two views so you do not count the serving twice. Carefully "
+        "inspect the ENTIRE meal yourself. The photos are the source of truth and have "
         "higher priority than the segmentation hints. First identify the dish, then make an exhaustive "
         "ingredient inventory: include every distinct visible food component, protein, starch, "
         "vegetable, sauce, and garnish. For recognizable mixed dishes, also include common ingredients "
         "that are likely mixed in and not individually separable in the photo (for example, chicken "
         "biryani can include rice, chicken, and visible or likely vegetables such as onion or peas). "
         "Use recipe knowledge only to name likely components of the dish, not to claim precise amounts "
-        "of ingredients hidden inside it. A FoodSeg103 segmenter returned these OPTIONAL, noisy hints: "
-        f"{json.dumps(areas, ensure_ascii=False)}. The segmenter may say only 'food', omit ingredients, "
+        "of ingredients hidden inside it. Food segmentation returned these OPTIONAL, noisy pixel-area "
+        "hints: top view="
+        f"{json.dumps(top_areas, ensure_ascii=False)}, side view={json.dumps(side_areas, ensure_ascii=False)}. "
+        "The segmenter may say only 'food', omit ingredients, "
         "or be wrong. Do not copy its labels as the answer, do not let it limit your visual analysis, "
-        "and ignore hints that conflict with the image. No portion weight is provided: estimate the "
-        "visible edible food mass from the apparent serving size, then divide it among the main food "
-        "components using typical recipe proportions. Weights must describe edible portions, not recipe "
+        "and ignore hints that conflict with the photos. No portion weight is provided: use the two "
+        "views to estimate serving volume (top-view footprint combined with side-view height), then "
+        "estimate mass using plausible food density and typical recipe proportions. This should be a "
+        "volume-informed estimate, not a guess based on one projection. Weights must describe edible portions, not recipe "
         "ingredient quantities. Do NOT assign gram weights to hidden spices, seasoning, oil, or tiny "
         "garnishes; omit those unless clearly visible as substantial portions. Avoid double-counting, "
         "keep the total plausible for the pictured serving, and round estimates to the nearest 10 g. "
@@ -157,7 +174,8 @@ async def vision(image: UploadFile = File(...)) -> dict[str, Any]:
         "messages": [{
             "role": "user",
             "content": prompt,
-            "images": [base64.b64encode(_jpeg_bytes(pil_image)).decode("ascii")],
+            "images": [base64.b64encode(_jpeg_bytes(top)).decode("ascii"),
+                       base64.b64encode(_jpeg_bytes(side)).decode("ascii")],
         }],
         "stream": False,
         "think": False,
@@ -188,11 +206,14 @@ async def vision(image: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=f"Qwen response error: {exc}")
 
     logger.info(
-        "vision completed: segmentation=%.2fs qwen=%.2fs total=%.2fs image=%sx%s",
+        "vision completed: segmentation=%.2fs qwen=%.2fs total=%.2fs top=%sx%s side=%sx%s",
         segmented_at - started, time.perf_counter() - segmented_at, time.perf_counter() - started,
-        pil_image.width, pil_image.height,
+        top.width, top.height, side.width, side.height,
     )
-    return {**parsed, "segmentation": {"areas": areas, "detections": detections}}
+    return {**parsed, "segmentation": {
+        "top_view": {"areas": top_areas, "detections": top_detections},
+        "side_view": {"areas": side_areas, "detections": side_detections},
+    }}
 
 
 def _jpeg_bytes(image: Image.Image) -> bytes:
