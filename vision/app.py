@@ -15,7 +15,7 @@ from typing import Any
 
 import httpx
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from ultralytics import YOLO
 
@@ -133,8 +133,11 @@ async def _read_food_image(upload: UploadFile, field_name: str) -> Image.Image:
 async def vision(
     top_image: UploadFile = File(..., description="Photo taken directly above the meal"),
     side_image: UploadFile = File(..., description="Photo taken from the side at plate level"),
+    plate_diameter_cm: float = Form(..., description="User-selected plate diameter in cm (typical choices: 20, 25, or 30)"),
 ) -> dict[str, Any]:
-    """Estimate ingredient weights from paired top and side views of one serving."""
+    """Estimate ingredient weights from paired views and a known plate diameter."""
+    if not 15 <= plate_diameter_cm <= 40:
+        raise HTTPException(status_code=422, detail="plate_diameter_cm must be between 15 and 40 cm")
     top = await _read_food_image(top_image, "top_image")
     side = await _read_food_image(side_image, "side_image")
 
@@ -145,8 +148,12 @@ async def vision(
     prompt = (
         "You are given TWO photos of the SAME serving: image 1 is the top-down view; image 2 is the "
         "side view at plate level. Use the top view to estimate footprint and the side view to estimate "
-        "food height/volume. Cross-check the two views so you do not count the serving twice. Carefully "
-        "inspect the ENTIRE meal yourself. The photos are the source of truth and have "
+        "food height/volume. Cross-check the two views so you do not count the serving twice. "
+        "Carefully inspect the ENTIRE meal yourself. "
+        f"The user selected a plate diameter of {plate_diameter_cm:g} cm. Assume the visible plate is "
+        "that size and use its rim as a real-world scale reference in both photos; estimate the food "
+        "footprint and height relative to the plate rather than treating image pixels as centimeters. "
+        "The photos are the source of truth and have "
         "higher priority than the segmentation hints. First identify the dish, then make an exhaustive "
         "ingredient inventory: include every distinct visible food component, protein, starch, "
         "vegetable, sauce, and garnish. For recognizable mixed dishes, also include common ingredients "
@@ -210,7 +217,7 @@ async def vision(
         segmented_at - started, time.perf_counter() - segmented_at, time.perf_counter() - started,
         top.width, top.height, side.width, side.height,
     )
-    return {**parsed, "segmentation": {
+    return {**parsed, "scale_reference": {"plate_diameter_cm": plate_diameter_cm}, "segmentation": {
         "top_view": {"areas": top_areas, "detections": top_detections},
         "side_view": {"areas": side_areas, "detections": side_detections},
     }}

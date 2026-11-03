@@ -28,19 +28,20 @@ $env:YOLO_CONFIG_DIR = "$PWD\.ultralytics"
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/docs` and upload both photos to `POST /vision`: `top_image` for a directly overhead photo and `side_image` for a side view at plate level. Both photos must show the same serving.
+Open `http://127.0.0.1:8000/docs` and upload both photos to `POST /vision`: `top_image` for a directly overhead photo and `side_image` for a side view at plate level. Both photos must show the same serving. Enter `plate_diameter_cm` as the user's selected plate diameter in centimeters; common choices are 20, 25, and 30 cm (accepted range: 15–40 cm). Keep the entire plate visible in both photos.
 
 Or use curl:
 
 ```powershell
 curl.exe -X POST http://127.0.0.1:8000/vision `
   -F "top_image=@C:\path\to\meal-top.jpg" `
-  -F "side_image=@C:\path\to\meal-side.jpg"
+  -F "side_image=@C:\path\to\meal-side.jpg" `
+  -F "plate_diameter_cm=25"
 ```
 
 ## Response and limitations
 
-The response contains an `ingredients` object with estimated grams and separate top/side segmentation summaries. Two views make volume estimation more credible, but mass is still estimated using likely food density; exact weight requires a scale or a known size reference in the photos.
+The response contains an `ingredients` object with estimated grams, the supplied `scale_reference`, and separate top/side segmentation summaries. Two views and a known plate diameter make volume estimation more grounded, but mass is still inferred using likely food density; exact weight requires a scale.
 
 The bundled checkpoint metadata currently contains only one class (`food`), despite the upstream model card describing 103 classes. It therefore provides food-region masks, not reliable ingredient classification. Qwen identifies food from the image; this segmentation model currently contributes only a coarse area cue.
 
