@@ -1,11 +1,12 @@
 # Food Vision API
 
-FastAPI endpoint that accepts two photos of the same serving (top-down and side-at-plate-level), plus a user-selected plate diameter. It estimates visible plate scale from the top view when the rim is fully in frame, runs the bundled YOLO food-region checkpoint on both views, asks Qwen for ingredient names and volume ranges, and converts those volume ranges to weight ranges with `food_density.json`.
+FastAPI endpoint that accepts two photos of the same serving (top-down and side-at-plate-level), plus a user-selected plate diameter. It estimates visible plate scale from the top view when the rim is fully in frame, runs a 104-class FoodSeg103 DeepLabV3+ MobileNetV2 semantic segmentation checkpoint on both views, asks Qwen for ingredient names and geometry estimates, and converts those estimates to weight ranges with `food_density.json`.
 
 ## Files
 
 - `app.py` — `POST /vision` and `GET /health` implementation.
-- `models/FoodSeg103-YOLO11l/best.pt` — segmentation weights, stored with Git LFS.
+- `models/FoodSeg103-DeepLabV3Plus-MobileNet/best_model.pth` — multi-class segmentation weights, stored with Git LFS.
+- `models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json` — 104-class ID-to-name mapping.
 - `food_density.json` — heuristic food-category density ranges in g/ml.
 - `evaluate_weights.py` — MAE/MAPE calculator for comparison against kitchen-scale measurements.
 - `requirements.txt` — Python dependencies.
@@ -26,7 +27,6 @@ In another PowerShell window:
 
 ```powershell
 cd path\to\ps\vision
-$env:YOLO_CONFIG_DIR = "$PWD\.ultralytics"
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
@@ -71,7 +71,7 @@ Example response shape:
 }
 ```
 
-The bundled checkpoint metadata currently contains only one class (`food`), despite the upstream model card describing 103 classes. It therefore provides food-region masks, not ingredient-specific masks. Qwen identifies visible foods; segmentation supplies only a coarse foreground-area cue. Replacing it with a verified multi-class checkpoint remains open work.
+The bundled DeepLabV3+ MobileNetV2 checkpoint outputs 104 semantic classes (background plus 103 FoodSeg103 labels). Its [model card](https://huggingface.co/mawiie/food-segmentation-mobilenet) reports 23.33% validation mIoU; expect missed or confused classes, especially for small, mixed, occluded, or visually similar ingredients. The endpoint passes detected ingredient-area summaries to Qwen. This is not a guarantee of ingredient-level accuracy on user photos.
 
 The nutrition training artifacts in the repository are not connected to this endpoint. The API does not return calories or macros; describe that model as a separate module until it is integrated and validated.
 

@@ -15,13 +15,15 @@ from typing import Any
 
 import httpx
 import numpy as np
+import torch
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
-from ultralytics import YOLO
+import segmentation_models_pytorch as smp
 
 
 ROOT = Path(__file__).resolve().parent
-SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103-YOLO11l/best.pt"))
+SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/best_model.pth"))
+LABELS_PATH = Path(os.getenv("FOODSEG_LABELS", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3-vl:2b")
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(15 * 1024 * 1024)))
@@ -29,8 +31,21 @@ CONFIDENCE = float(os.getenv("FOODSEG_CONFIDENCE", "0.25"))
 
 if not SEGMENTER_PATH.is_file():
     raise RuntimeError(f"FoodSeg103 weights not found: {SEGMENTER_PATH}")
+if not LABELS_PATH.is_file():
+    raise RuntimeError(f"FoodSeg103 class labels not found: {LABELS_PATH}")
 
-segmenter = YOLO(str(SEGMENTER_PATH))
+with LABELS_PATH.open(encoding="utf-8") as f:
+    _label_config = json.load(f)
+CLASS_NAMES = {int(key): value for key, value in _label_config["id2label"].items()}
+if len(CLASS_NAMES) != 104:
+    raise RuntimeError(f"Expected 104 FoodSeg103 classes, found {len(CLASS_NAMES)}")
+
+segmenter = smp.DeepLabV3Plus(
+    encoder_name="mobilenet_v2", encoder_weights=None, in_channels=3, classes=104
+)
+segmenter.load_state_dict(torch.load(SEGMENTER_PATH, map_location="cpu", weights_only=True))
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+segmenter.to(DEVICE).eval()
 app = FastAPI(title="Food Vision API", version="1.0.0")
 logger = logging.getLogger("foodvision")
 MAX_SIDE = int(os.getenv("VISION_MAX_SIDE", "768"))
@@ -63,44 +78,48 @@ DENSITY_TABLE = json.loads((ROOT / "food_density.json").read_text(encoding="utf-
 
 
 def segmentation_summary(image: Image.Image) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
-    """Return class area fractions, per-instance metadata, and union mask pixels."""
-    result = segmenter.predict(
-        image, conf=CONFIDENCE, imgsz=SEGMENT_SIZE, device=0 if __import__("torch").cuda.is_available() else "cpu",
-        half=__import__("torch").cuda.is_available(), max_det=30, verbose=False,
-    )[0]
-    if result.masks is None or result.boxes is None or len(result.boxes) == 0:
-        return [], [], 0
+    """Run 104-class semantic segmentation and summarize each predicted food mask."""
+    width, height = image.size
+    model_image = image.resize((SEGMENT_SIZE, SEGMENT_SIZE), Image.Resampling.BILINEAR)
+    pixels = np.asarray(model_image, dtype=np.float32) / 255.0
+    mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
+    tensor = torch.from_numpy(((pixels - mean) / std).transpose(2, 0, 1)).unsqueeze(0).to(DEVICE)
 
-    names = result.names
-    masks = result.masks.data.detach().cpu().numpy()
-    classes = result.boxes.cls.detach().cpu().numpy().astype(int)
-    confidences = result.boxes.conf.detach().cpu().numpy()
-    h, w = image.height, image.width
+    with torch.inference_mode():
+        logits = segmenter(tensor)
+        probabilities = torch.softmax(logits, dim=1)[0]
+        confidence, prediction = probabilities.max(dim=0)
+    pred = prediction.detach().cpu().numpy().astype(np.uint8)
+    confidence_map = confidence.detach().cpu().numpy()
+    pred = np.asarray(Image.fromarray(pred).resize((width, height), Image.Resampling.NEAREST))
+    confidence_map = np.asarray(
+        Image.fromarray(confidence_map.astype(np.float32), mode="F").resize(
+            (width, height), Image.Resampling.BILINEAR
+        ), dtype=np.float32
+    )
 
-    class_masks: dict[int, np.ndarray] = {}
-    instances: list[dict[str, Any]] = []
-    for mask, class_id, confidence in zip(masks, classes, confidences):
-        binary = Image.fromarray((mask > 0.5).astype(np.uint8) * 255).resize(
-            (w, h), Image.Resampling.NEAREST
-        )
-        binary_array = np.asarray(binary) > 0
-        class_masks[class_id] = class_masks.get(class_id, np.zeros((h, w), dtype=bool)) | binary_array
-        instances.append({
-            "class": str(names.get(int(class_id), class_id)),
-            "confidence": round(float(confidence), 4),
-        })
-
-    areas = []
-    for class_id, mask in class_masks.items():
-        fraction = float(mask.sum()) / float(h * w)
-        if fraction > 0:
-            areas.append({
-                "class": str(names.get(int(class_id), class_id)),
-                "area_percent": round(fraction * 100, 2),
-            })
+    areas: list[dict[str, Any]] = []
+    detections: list[dict[str, Any]] = []
+    total_pixels = width * height
+    food_pixels = 0
+    for class_id in np.unique(pred):
+        class_id = int(class_id)
+        if class_id == 0 or class_id not in CLASS_NAMES:
+            continue
+        mask = pred == class_id
+        count = int(mask.sum())
+        fraction = count / total_pixels
+        mean_conf = float(confidence_map[mask].mean())
+        if fraction < 0.001 or mean_conf < CONFIDENCE:
+            continue
+        class_name = CLASS_NAMES[class_id]
+        food_pixels += count
+        areas.append({"class": class_name, "area_percent": round(fraction * 100, 2)})
+        detections.append({"class": class_name, "confidence": round(mean_conf, 4)})
     areas.sort(key=lambda item: item["area_percent"], reverse=True)
-    union_pixels = int(np.logical_or.reduce(list(class_masks.values())).sum()) if class_masks else 0
-    return areas, instances, union_pixels
+    detections.sort(key=lambda item: item["confidence"], reverse=True)
+    return areas, detections, food_pixels
 
 
 def detect_top_plate_scale(image: Image.Image, plate_diameter_cm: float, food_pixels: int) -> dict[str, Any]:
@@ -244,8 +263,9 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "segmenter": "loaded",
-        "segmenter_class_count": len(segmenter.names),
-        "segmenter_classes": list(segmenter.names.values()),
+        "segmenter_class_count": len(CLASS_NAMES),
+        "segmenter_classes": list(CLASS_NAMES.values()),
+        "segmenter_device": str(DEVICE),
         "density_categories": list(DENSITY_TABLE),
         "qwen_model": QWEN_MODEL,
     }
@@ -307,8 +327,9 @@ async def vision(
         "Food segmentation returned these OPTIONAL, noisy pixel-area "
         "hints: top view="
         f"{json.dumps(top_areas, ensure_ascii=False)}, side view={json.dumps(side_areas, ensure_ascii=False)}. "
-        "The segmenter may say only 'food', omit ingredients, "
-        "or be wrong. Do not copy its labels as the answer, do not let it limit your visual analysis, "
+        "The semantic segmenter can miss or confuse ingredients, especially for small or occluded regions. "
+        "Use its class labels as useful but imperfect evidence; cross-check against the photos and do not "
+        "let one uncertain label dominate your visual analysis. "
         "and ignore hints that conflict with the photos. If plate calibration succeeds, the server will "
         "calculate volume as calibrated food footprint × your component area share × side-view height "
         "× shape factor; otherwise it uses your fallback volume range. The server then applies a "
@@ -370,7 +391,7 @@ async def vision(
         "limitations": [
             "These are AI-assisted estimates, not measured weights.",
             "Plate calibration depends on a visible, fully framed plate rim; occlusion or perspective can reduce accuracy.",
-            "The bundled segmentation checkpoint detects a generic food class, not ingredient-specific masks.",
+            "The multi-class segmentation model can miss or confuse ingredients, especially when foods overlap.",
             "Food density varies with packing, moisture, cooking, and recipe.",
         ],
         "segmentation": {
