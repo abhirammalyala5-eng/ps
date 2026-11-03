@@ -1,0 +1,88 @@
+{
+  "cooked_grain": {
+    "min": 0.65,
+    "max": 0.95,
+    "examples": [
+      "rice",
+      "noodles",
+      "pasta",
+      "biryani"
+    ]
+  },
+  "cooked_meat": {
+    "min": 0.85,
+    "max": 1.1,
+    "examples": [
+      "chicken",
+      "beef",
+      "pork",
+      "fish"
+    ]
+  },
+  "legume_or_curry": {
+    "min": 0.8,
+    "max": 1.15,
+    "examples": [
+      "dal",
+      "lentils",
+      "beans",
+      "curry"
+    ]
+  },
+  "vegetable": {
+    "min": 0.45,
+    "max": 0.95,
+    "examples": [
+      "vegetables",
+      "onion",
+      "peas",
+      "salad",
+      "herbs"
+    ]
+  },
+  "sauce": {
+    "min": 0.8,
+    "max": 1.2,
+    "examples": [
+      "sauce",
+      "gravy",
+      "soup"
+    ]
+  },
+  "bread": {
+    "min": 0.25,
+    "max": 0.7,
+    "examples": [
+      "bread",
+      "roti",
+      "chapati",
+      "naan"
+    ]
+  },
+  "fruit": {
+    "min": 0.55,
+    "max": 1.05,
+    "examples": [
+      "fruit",
+      "apple",
+      "banana",
+      "mango"
+    ]
+  },
+  "dairy": {
+    "min": 0.85,
+    "max": 1.15,
+    "examples": [
+      "cheese",
+      "paneer",
+      "yogurt"
+    ]
+  },
+  "mixed_food": {
+    "min": 0.7,
+    "max": 1.1,
+    "examples": [
+      "other foods"
+    ]
+  }
+}
