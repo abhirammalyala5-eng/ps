@@ -1,0 +1,14 @@
+# Model files — too large for git, place manually
+*.cbm
+*.joblib
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+env/
+
+# Test scripts
+test_api.py
