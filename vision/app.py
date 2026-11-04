@@ -60,14 +60,22 @@ OUTPUT_SCHEMA = {
             "properties": {
                 "name": {"type": "string"},
                 "food_area_fraction": {"type": "number"},
-                "height_cm_min": {"type": "number"},
-                "height_cm_max": {"type": "number"},
+                "height_fraction_min": {
+                    "type": "number",
+                    "maximum": 0.2,
+                    "description": "Minimum average food height divided by plate diameter; 0.1 means one tenth of the plate diameter, not 0.1 cm. Typical plated food is 0.05 to 0.2.",
+                },
+                "height_fraction_max": {
+                    "type": "number",
+                    "maximum": 0.2,
+                    "description": "Maximum average food height divided by plate diameter; 0.1 means one tenth of the plate diameter, not 0.1 cm. Typical plated food is 0.05 to 0.2.",
+                },
                 "shape_factor": {"type": "number"},
                 "volume_ml_min": {"type": "number"},
                 "volume_ml_max": {"type": "number"},
                 "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
             },
-            "required": ["name", "food_area_fraction", "height_cm_min", "height_cm_max", "shape_factor", "volume_ml_min", "volume_ml_max", "confidence"],
+            "required": ["name", "food_area_fraction", "height_fraction_min", "height_fraction_max", "shape_factor", "volume_ml_min", "volume_ml_max", "confidence"],
             "additionalProperties": False,
         }},
     },
@@ -168,7 +176,7 @@ def detect_top_plate_scale(image: Image.Image, plate_diameter_cm: float, food_pi
     }
 
 
-def parse_component_response(text: str) -> dict[str, Any]:
+def parse_component_response(text: str, plate_diameter_cm: float) -> dict[str, Any]:
     text = text.strip()
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE)
     try:
@@ -186,8 +194,14 @@ def parse_component_response(text: str) -> dict[str, Any]:
             continue
         try:
             area_share = max(0.0, min(float(item["food_area_fraction"]), 1.0))
-            height_min = max(0.0, min(float(item["height_cm_min"]), 30.0))
-            height_max = max(height_min, min(float(item["height_cm_max"]), 30.0))
+            # Qwen tends to emit 0.1 for a pile around one tenth of the plate diameter.
+            # Treat height as a dimensionless ratio, then apply the user's physical plate size.
+            # Cap average plated-food height at 20% of plate diameter (4 cm on a 20 cm plate).
+            # Larger fractions from this small VLM were producing implausibly huge servings.
+            height_fraction_min = max(0.0, min(float(item["height_fraction_min"]), 0.2))
+            height_fraction_max = max(height_fraction_min, min(float(item["height_fraction_max"]), 0.2))
+            height_min = height_fraction_min * plate_diameter_cm
+            height_max = height_fraction_max * plate_diameter_cm
             shape_factor = max(0.2, min(float(item["shape_factor"]), 1.0))
             low = max(0.0, min(float(item["volume_ml_min"]), 5000.0))
             high = max(low, min(float(item["volume_ml_max"]), 5000.0))
@@ -321,8 +335,11 @@ async def vision(
         "ingredient inventory of substantial visible food components. Do not invent hidden spices or "
         "recipe ingredients that cannot be seen. For each component, estimate its share of the total "
         "segmented food footprint (all component shares should sum to about 1), its average height range "
-        "in centimeters from the side view using the plate diameter as scale, and a shape factor from "
-        "0.2 to 1.0 (flat/irregular foods lower, compact mounds closer to 1). Also provide a fallback "
+        "as a fraction of the selected plate diameter (not centimeters): for a 20 cm plate, a food height "
+        "one tenth as tall as the plate diameter is 0.10. The server converts this ratio to centimeters. "
+        "Do not return 0.10 when you mean 0.10 cm; the field is a dimensionless ratio. Estimate a shape factor from "
+        "0.2 to 1.0 (flat/irregular foods lower, compact mounds closer to 1). A typical plated layer is "
+        "0.05–0.20 of the plate diameter. Also provide a fallback "
         "low/high volume in milliliters in case computer-vision plate calibration fails. Use recipe "
         "knowledge only to identify visible foods. Return a confidence of low, medium, or high. "
         "Food segmentation returned these OPTIONAL, noisy pixel-area "
@@ -337,7 +354,7 @@ async def vision(
         "food-category density range to produce gram ranges. Avoid double-counting views. Do not return "
         "gram weights. "
         'Return only JSON with keys "dish" and "components"; each component must have "name", '
-        '"food_area_fraction", "height_cm_min", "height_cm_max", "shape_factor", "volume_ml_min", '
+        '"food_area_fraction", "height_fraction_min", "height_fraction_max", "shape_factor", "volume_ml_min", '
         '"volume_ml_max", and "confidence".'
     )
     payload = {
@@ -362,7 +379,7 @@ async def vision(
         message = ollama_result.get("message", {})
         answer = message.get("content") or message.get("thinking", "")
         try:
-            parsed = parse_component_response(answer)
+            parsed = parse_component_response(answer, plate_diameter_cm)
         except (ValueError, json.JSONDecodeError) as exc:
             logger.error("Qwen returned unusable content=%r thinking=%r", answer[:300], ollama_result.get("message", {}).get("thinking", "")[:200])
             raise ValueError(f"{exc}; response={answer[:160]!r}") from exc
@@ -387,6 +404,24 @@ async def vision(
         top.width, top.height, side.width, side.height,
     )
     estimates = build_weight_estimates(parsed["components"], plate_scale)
+    top_classes = [item["class"] for item in top_areas]
+    side_classes = [item["class"] for item in side_areas]
+    views_share_class = bool(set(top_classes) & set(side_classes))
+    limitations = [
+        "These are AI-assisted estimates, not measured weights.",
+        "Plate calibration depends on a visible, fully framed plate rim; occlusion or perspective can reduce accuracy.",
+        "The multi-class segmentation model can miss or confuse ingredients, especially when foods overlap.",
+        "Food density varies with packing, moisture, cooking, and recipe.",
+    ]
+    if top_classes and side_classes and not views_share_class:
+        limitations.append(
+            "FoodSeg labels differ between the two views (top: " + ", ".join(top_classes[:3]) +
+            "; side: " + ", ".join(side_classes[:3]) +
+            "). Check that both photos show the same serving; the segmenter can also mislabel food."
+        )
+        for estimate in estimates:
+            if estimate["confidence"] == "high":
+                estimate["confidence"] = "medium"
     ingredient_totals = {item["name"]: item["weight_g"]["estimate"] for item in estimates}
     return {
         "dish": parsed["dish"],
@@ -394,12 +429,7 @@ async def vision(
         "estimates": estimates,
         "scale_reference": {"plate_diameter_cm": plate_diameter_cm, **plate_scale},
         "method": "Qwen estimates component volumes from two views; backend multiplies volume ranges by food-category density ranges.",
-        "limitations": [
-            "These are AI-assisted estimates, not measured weights.",
-            "Plate calibration depends on a visible, fully framed plate rim; occlusion or perspective can reduce accuracy.",
-            "The multi-class segmentation model can miss or confuse ingredients, especially when foods overlap.",
-            "Food density varies with packing, moisture, cooking, and recipe.",
-        ],
+        "limitations": limitations,
         "segmentation": {
         "top_view": {"areas": top_areas, "detections": top_detections},
         "side_view": {"areas": side_areas, "detections": side_detections},
