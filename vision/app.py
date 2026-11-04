@@ -26,6 +26,7 @@ SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103-DeepL
 LABELS_PATH = Path(os.getenv("FOODSEG_LABELS", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3-vl:2b")
+QWEN_NUM_CTX = int(os.getenv("QWEN_NUM_CTX", "6144"))
 MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(15 * 1024 * 1024)))
 CONFIDENCE = float(os.getenv("FOODSEG_CONFIDENCE", "0.25"))
 
@@ -350,7 +351,7 @@ async def vision(
         "stream": False,
         "think": False,
         "format": OUTPUT_SCHEMA,
-        "options": {"temperature": 0, "num_predict": 320, "num_ctx": 2048},
+        "options": {"temperature": 0, "num_predict": 768, "num_ctx": QWEN_NUM_CTX},
         "keep_alive": "10m",
     }
     try:
@@ -371,6 +372,11 @@ async def vision(
         detail = exc.response.text[:500]
         if exc.response.status_code == 404:
             detail = f"Ollama model '{QWEN_MODEL}' is unavailable. Run `ollama pull {QWEN_MODEL}`."
+        elif "exceed_context_size_error" in detail or "exceeds the available context size" in detail:
+            detail = (
+                f"The request exceeded Ollama's context window. The API is configured for "
+                f"{QWEN_NUM_CTX} tokens; set QWEN_NUM_CTX higher and restart the API."
+            )
         raise HTTPException(status_code=502, detail=detail)
     except (httpx.TimeoutException, ValueError, json.JSONDecodeError) as exc:
         raise HTTPException(status_code=502, detail=f"Qwen response error: {exc}")

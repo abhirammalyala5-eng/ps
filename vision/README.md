@@ -85,4 +85,4 @@ Capture top and side photos, record the model estimate, then weigh each componen
 
 The script reports MAE in grams and MAPE for nonzero actual weights. Collect a held-out set of at least 30–50 servings before presenting accuracy metrics; do not report training examples as evaluation.
 
-For a different Ollama URL/model, set `OLLAMA_URL` and `QWEN_MODEL`. Other optional settings: `FOODSEG_MODEL`, `MAX_IMAGE_BYTES`, `FOODSEG_CONFIDENCE`, `VISION_MAX_SIDE`, and `FOODSEG_IMAGE_SIZE`.
+For a different Ollama URL/model, set `OLLAMA_URL` and `QWEN_MODEL`. The API requests a 6144-token context by default; change it with `QWEN_NUM_CTX` if Ollama reports that the prompt exceeds its context window. Other optional settings: `FOODSEG_MODEL`, `MAX_IMAGE_BYTES`, `FOODSEG_CONFIDENCE`, `VISION_MAX_SIDE`, and `FOODSEG_IMAGE_SIZE`.
