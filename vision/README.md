@@ -4,7 +4,13 @@ FastAPI backend that accepts two photos of one food serving and a plate diameter
 
 ## Setup on Windows
 
-This guide assumes **Ollama and `qwen3-vl:2b` are already installed**. It also requires Python 3.11, Git, and Git LFS. The segmentation checkpoint is included in this repository using Git LFS.
+This guide assumes **Ollama and `qwen3-vl:2b` are already installed**. On a new Windows computer, also install:
+
+- [Python 3.11 for Windows](https://www.python.org/downloads/windows/) (64-bit; keep the Python Launcher enabled).
+- [Git for Windows](https://git-scm.com/download/win).
+- [Git LFS](https://git-lfs.com/) so the FoodSeg checkpoint downloads instead of a small pointer file.
+
+The segmentation checkpoint is included in this repository using Git LFS.
 
 ### 1. Install Git LFS and get this branch
 
@@ -21,9 +27,10 @@ Check that `models\FoodSeg103-DeepLabV3Plus-MobileNet\best_model.pth` is a real 
 
 ### 2. Install Python dependencies
 
-Install Python 3.11 if needed, then from the `ps\vision` folder run:
+Confirm Python is available, then from the `ps\vision` folder run:
 
 ```powershell
+py -3.11 --version
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
