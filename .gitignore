@@ -1,0 +1,16 @@
+# Python environments and generated files
+.venv/
+.venv_*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local model downloads and caches (the API checkpoint in vision/models is tracked)
+/.ultralytics/
+/.cache/
+/models/
+**/.cache/
+
+# Local configuration and logs
+.env
+*.log
