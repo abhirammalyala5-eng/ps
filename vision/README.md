@@ -1,38 +1,61 @@
 # Food Vision API
 
-FastAPI endpoint that accepts two photos of the same serving (top-down and side-at-plate-level), plus a user-selected plate diameter. It estimates visible plate scale from the top view when the rim is fully in frame, runs a 104-class FoodSeg103 DeepLabV3+ MobileNetV2 semantic segmentation checkpoint on both views, asks Qwen for ingredient names and geometry estimates, and converts those estimates to weight ranges with `food_density.json`.
+FastAPI backend that accepts two photos of one food serving and a plate diameter, runs FoodSeg103 semantic segmentation, asks a local Qwen3-VL model to identify visible ingredients and estimate their geometry, and returns approximate gram weights as JSON.
 
-## Files
+## Setup on Windows
 
-- `app.py` — `POST /vision` and `GET /health` implementation.
-- `models/FoodSeg103-DeepLabV3Plus-MobileNet/best_model.pth` — multi-class segmentation weights, stored with Git LFS.
-- `models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json` — 104-class ID-to-name mapping.
-- `food_density.json` — heuristic food-category density ranges in g/ml.
-- `evaluate_weights.py` — MAE/MAPE calculator for comparison against kitchen-scale measurements.
-- `requirements.txt` — Python dependencies.
+This guide assumes **Ollama and `qwen3-vl:2b` are already installed**. It also requires Python 3.11, Git, and Git LFS. The segmentation checkpoint is included in this repository using Git LFS.
 
-## Windows setup
+### 1. Install Git LFS and get this branch
 
-Install Python 3.11, [uv](https://docs.astral.sh/uv/), and [Ollama](https://ollama.com/download). Then from this `vision` folder:
+If Git LFS is not installed, install it first from [git-lfs.com](https://git-lfs.com/). Then open PowerShell and run:
 
 ```powershell
-uv venv .venv --python 3.11
-uv pip install --python .venv\Scripts\python.exe torch torchvision --index-url https://download.pytorch.org/whl/cu128
-uv pip install --python .venv\Scripts\python.exe -r requirements.txt
-ollama pull qwen3-vl:2b
-ollama serve
+git lfs install
+git clone --branch vision https://github.com/abhirammalyala5-eng/ps.git
+cd ps\vision
+git lfs pull
 ```
 
-In another PowerShell window:
+Check that `models\FoodSeg103-DeepLabV3Plus-MobileNet\best_model.pth` is a real model file (about 18 MB), not a small text pointer.
+
+### 2. Install Python dependencies
+
+Install Python 3.11 if needed, then from the `ps\vision` folder run:
 
 ```powershell
-cd path\to\ps\vision
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+PyTorch will use CUDA when a compatible NVIDIA setup is available; otherwise the segmentation model runs on CPU and will be slower. The project does not require a separately installed CUDA toolkit.
+
+### 3. Start Ollama and the API
+
+Ollama must be serving `qwen3-vl:2b`. Check it with:
+
+```powershell
+ollama list
+```
+
+If Ollama is installed but its service is not running, open a second PowerShell window and run `ollama serve`. In the first window, from `ps\vision`, start FastAPI:
+
+```powershell
 .\.venv\Scripts\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/docs` and upload both photos to `POST /vision`: `top_image` for a directly overhead photo and `side_image` for a side view at plate level. Both photos must show the same serving. Enter `plate_diameter_cm` as the user's selected plate diameter in centimeters; common choices are 20, 25, and 30 cm (accepted range: 15–40 cm). Keep the entire plate visible in both photos.
+Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). `GET /health` reports whether the segmentation model loaded and whether PyTorch selected CUDA or CPU.
 
-Or use curl:
+## Try `POST /vision`
+
+Upload:
+
+- `top_image`: a directly overhead photo.
+- `side_image`: a view from near plate level.
+- `plate_diameter_cm`: the plate's actual diameter (accepted range 15–40 cm).
+
+**Both photos must show the same serving on the same plate.** Keep the entire plate visible, use good lighting, and avoid changing the food between shots. For example:
 
 ```powershell
 curl.exe -X POST http://127.0.0.1:8000/vision `
@@ -41,48 +64,40 @@ curl.exe -X POST http://127.0.0.1:8000/vision `
   -F "plate_diameter_cm=25"
 ```
 
-## Response and limitations
+## How it estimates weights
 
-The response includes:
+1. A 104-class FoodSeg103 DeepLabV3+ MobileNetV2 model labels image pixels and reports class-area hints for both photos.
+2. OpenCV looks for a fully visible plate rim in the top photo. The known plate diameter gives a rough pixel scale and food footprint in square centimeters.
+3. Qwen3-VL receives both photos and the segmentation hints. It estimates the dish, visible components, each component's share of the food footprint, and its height as a fraction of plate diameter.
+4. The backend converts that height fraction to centimeters, estimates volume from `component footprint × height × shape factor`, then multiplies by a hand-configured food-category density range in `food_density.json` to estimate grams.
+5. If plate calibration fails, the API uses Qwen's fallback volume range and marks confidence low. If segmentation labels strongly disagree between views, the response warns that the pair may not show the same serving or that the segmenter may have misclassified food.
+
+The height fraction is capped at 0.20 of the plate diameter as a guard against implausibly tall estimates from the small vision model. This is still a heuristic volume model, not 3D reconstruction or a kitchen-scale measurement.
+
+## Response
 
 - `ingredients`: central estimated grams per component.
-- `estimates`: estimated volume range, density range, weight range, confidence, and method per component.
-- `scale_reference`: selected plate diameter and the top-view circle calibration result, if detected.
-- `limitations`: model and measurement caveats.
+- `estimates`: volume range, density range, weight range, confidence, and method per component.
+- `scale_reference`: selected plate diameter and detected plate scale, when available.
+- `segmentation`: predicted classes, pixel-area shares, and class confidence for each view.
+- `limitations`: warnings about calibration, segmentation, density assumptions, or inconsistent views.
 
-When the top-view plate rim can be calibrated, the backend estimates each component's volume as `calibrated food footprint × Qwen-estimated component area share × Qwen-estimated side-view height × shape factor`. It multiplies that volume interval by the category's density interval in `food_density.json` to calculate a weight range. If plate calibration fails, it falls back to Qwen's two-view volume interval and marks confidence low. This is an approximate geometric model, not a reconstructed 3D surface; treat results as AI-assisted estimates, not measurements.
+The bundled checkpoint has 104 output labels (background plus 103 FoodSeg103 classes). Its [model card](https://huggingface.co/mawiie/food-segmentation-mobilenet) reports 23.33% validation mIoU. It can confuse or miss foods, especially in mixed dishes, so segmentation labels are hints rather than ground truth. The system has not been validated for weight accuracy on a held-out meal dataset; do not claim an accuracy score without weighing test portions.
 
-Example response shape:
+## Evaluate against a kitchen scale
 
-```json
-{
-  "dish": "chicken biryani",
-  "ingredients": {"rice": 220, "chicken": 100},
-  "estimates": [{
-    "name": "rice",
-    "volume_ml": {"min": 220, "estimate": 280, "max": 350},
-    "density_g_per_ml": {"min": 0.65, "max": 0.95},
-    "weight_g": {"min": 140, "estimate": 220, "max": 330},
-    "confidence": "medium",
-    "method": "calibrated top-view food footprint × estimated side-view height × shape factor × food-category density range"
-  }],
-  "scale_reference": {"plate_diameter_cm": 25, "detected": true},
-  "limitations": ["These are AI-assisted estimates, not measured weights."]
-}
-```
-
-The bundled DeepLabV3+ MobileNetV2 checkpoint outputs 104 semantic classes (background plus 103 FoodSeg103 labels). Its [model card](https://huggingface.co/mawiie/food-segmentation-mobilenet) reports 23.33% validation mIoU; expect missed or confused classes, especially for small, mixed, occluded, or visually similar ingredients. The endpoint passes detected ingredient-area summaries to Qwen. This is not a guarantee of ingredient-level accuracy on user photos.
-
-The nutrition training artifacts in the repository are not connected to this endpoint. The API does not return calories or macros; describe that model as a separate module until it is integrated and validated.
-
-## Validate against weighed portions
-
-Capture top and side photos, record the model estimate, then weigh each component with a kitchen scale. Build a CSV with columns `ingredient_name,actual_g,predicted_g` and run:
+Create a CSV with columns `ingredient_name,actual_g,predicted_g`, using meals that were not used to tune prompts or thresholds. Then run:
 
 ```powershell
 .\.venv\Scripts\python.exe evaluate_weights.py weighed_results.csv
 ```
 
-The script reports MAE in grams and MAPE for nonzero actual weights. Collect a held-out set of at least 30–50 servings before presenting accuracy metrics; do not report training examples as evaluation.
+This reports mean absolute error (MAE) in grams and mean absolute percentage error (MAPE). The separate files in `ML_Model/` and `train/` are not connected to this API; the API does not return calories or macros.
 
-For a different Ollama URL/model, set `OLLAMA_URL` and `QWEN_MODEL`. The API requests a 6144-token context by default; change it with `QWEN_NUM_CTX` if Ollama reports that the prompt exceeds its context window. Other optional settings: `FOODSEG_MODEL`, `MAX_IMAGE_BYTES`, `FOODSEG_CONFIDENCE`, `VISION_MAX_SIDE`, and `FOODSEG_IMAGE_SIZE`.
+## Main files
+
+- `app.py` — FastAPI routes, segmentation, Ollama request, and weight estimation.
+- `models/FoodSeg103-DeepLabV3Plus-MobileNet/` — segmentation checkpoint and class labels.
+- `food_density.json` — heuristic density ranges by food category.
+- `requirements.txt` — Python packages required to run the API.
+- `evaluate_weights.py` — comparison tool for weighed portions.
