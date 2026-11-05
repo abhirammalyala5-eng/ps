@@ -21,7 +21,7 @@ cd ps\vision
 git lfs pull
 ```
 
-Confirm `models\FoodSeg103-DeepLabV3Plus-MobileNet\best_model.pth` is about 18 MB. If it is a small text file, Git LFS did not download the checkpoint.
+Confirm `models\FoodSeg103\best_model.pth` is about 18 MB. If it is a small text file, Git LFS did not download the checkpoint.
 
 ### 2. Install the API's Python packages
 

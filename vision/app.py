@@ -12,6 +12,7 @@ import re
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 import numpy as np
@@ -22,8 +23,8 @@ import segmentation_models_pytorch as smp
 
 
 ROOT = Path(__file__).resolve().parent
-SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/best_model.pth"))
-LABELS_PATH = Path(os.getenv("FOODSEG_LABELS", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json"))
+SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103/best_model.pth"))
+LABELS_PATH = Path(os.getenv("FOODSEG_LABELS", ROOT / "models/FoodSeg103/labels_config.json"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3-vl:2b")
 QWEN_NUM_CTX = int(os.getenv("QWEN_NUM_CTX", "16384"))
@@ -32,6 +33,12 @@ MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "50000000"))
 CONFIDENCE = float(os.getenv("FOODSEG_CONFIDENCE", "0.25"))
 FOODSEG_TILE_SIZE = int(os.getenv("FOODSEG_TILE_SIZE", "512"))
 FOODSEG_TILE_OVERLAP = int(os.getenv("FOODSEG_TILE_OVERLAP", "64"))
+
+_ollama_endpoint = urlparse(OLLAMA_URL)
+if _ollama_endpoint.scheme not in {"http", "https"} or _ollama_endpoint.hostname not in {"localhost", "127.0.0.1", "::1"}:
+    raise RuntimeError("Offline mode requires OLLAMA_URL to point to this computer (localhost)")
+if QWEN_MODEL.lower().endswith("-cloud"):
+    raise RuntimeError("Offline mode cannot use an Ollama cloud model; configure a locally installed model")
 
 if not SEGMENTER_PATH.is_file():
     raise RuntimeError(f"FoodSeg103 weights not found: {SEGMENTER_PATH}")
@@ -327,6 +334,8 @@ async def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "segmenter": "loaded",
+        "segmenter_name": "FoodSeg103",
+        "segmenter_architecture": "DeepLabV3+ with MobileNetV2 encoder",
         "segmenter_class_count": len(CLASS_NAMES),
         "segmenter_classes": list(CLASS_NAMES.values()),
         "segmenter_device": str(DEVICE),
@@ -337,6 +346,7 @@ async def health() -> dict[str, Any]:
         "max_image_pixels": MAX_IMAGE_PIXELS,
         "density_categories": list(DENSITY_TABLE),
         "qwen_model": QWEN_MODEL,
+        "offline_runtime": True,
     }
 
 
@@ -451,7 +461,10 @@ async def vision(
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text[:500]
         if exc.response.status_code == 404:
-            detail = f"Ollama model '{QWEN_MODEL}' is unavailable. Run `ollama pull {QWEN_MODEL}`."
+            detail = (
+                f"Local Ollama model '{QWEN_MODEL}' is unavailable. Verify it with `ollama list`; "
+                "the API does not download models."
+            )
         elif "exceed_context_size_error" in detail or "exceeds the available context size" in detail:
             detail = (
                 f"The request exceeded Ollama's context window. The API is configured for "

@@ -7,14 +7,14 @@ $PythonCandidates = @(
     (Join-Path $ProjectRoot "vision\.venv\Scripts\python.exe")
 )
 $Python = $PythonCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-$Weights = Join-Path $ProjectRoot "vision\models\FoodSeg103-DeepLabV3Plus-MobileNet\best_model.pth"
-$Labels = Join-Path $ProjectRoot "vision\models\FoodSeg103-DeepLabV3Plus-MobileNet\labels_config.json"
+$Weights = Join-Path $ProjectRoot "vision\models\FoodSeg103\best_model.pth"
+$Labels = Join-Path $ProjectRoot "vision\models\FoodSeg103\labels_config.json"
 
 if (-not $Python) {
     Write-Error "No API Python environment was found. Set one up using the Windows instructions in vision\README.md, then run this script again."
 }
 if (-not (Test-Path -LiteralPath $Weights) -or -not (Test-Path -LiteralPath $Labels)) {
-    Write-Error "FoodSeg103 model files are missing from vision\models\FoodSeg103-DeepLabV3Plus-MobileNet. Re-download or restore the model files before starting the API."
+    Write-Error "FoodSeg103 model files are missing from vision\models\FoodSeg103. Restore the checkpoint and label map before starting the API."
 }
 
 Set-Location $ProjectRoot
