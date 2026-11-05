@@ -17,7 +17,7 @@ import httpx
 import numpy as np
 import torch
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 import segmentation_models_pytorch as smp
 
 
@@ -26,9 +26,12 @@ SEGMENTER_PATH = Path(os.getenv("FOODSEG_MODEL", ROOT / "models/FoodSeg103-DeepL
 LABELS_PATH = Path(os.getenv("FOODSEG_LABELS", ROOT / "models/FoodSeg103-DeepLabV3Plus-MobileNet/labels_config.json"))
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen3-vl:2b")
-QWEN_NUM_CTX = int(os.getenv("QWEN_NUM_CTX", "6144"))
-MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(15 * 1024 * 1024)))
+QWEN_NUM_CTX = int(os.getenv("QWEN_NUM_CTX", "16384"))
+MAX_IMAGE_BYTES = int(os.getenv("MAX_IMAGE_BYTES", str(40 * 1024 * 1024)))
+MAX_IMAGE_PIXELS = int(os.getenv("MAX_IMAGE_PIXELS", "50000000"))
 CONFIDENCE = float(os.getenv("FOODSEG_CONFIDENCE", "0.25"))
+FOODSEG_TILE_SIZE = int(os.getenv("FOODSEG_TILE_SIZE", "512"))
+FOODSEG_TILE_OVERLAP = int(os.getenv("FOODSEG_TILE_OVERLAP", "64"))
 
 if not SEGMENTER_PATH.is_file():
     raise RuntimeError(f"FoodSeg103 weights not found: {SEGMENTER_PATH}")
@@ -49,8 +52,10 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 segmenter.to(DEVICE).eval()
 app = FastAPI(title="Food Vision API", version="1.0.0")
 logger = logging.getLogger("foodvision")
-MAX_SIDE = int(os.getenv("VISION_MAX_SIDE", "768"))
-SEGMENT_SIZE = int(os.getenv("FOODSEG_IMAGE_SIZE", "512"))
+if FOODSEG_TILE_SIZE < 32 or FOODSEG_TILE_SIZE % 32 != 0:
+    raise RuntimeError("FOODSEG_TILE_SIZE must be a positive multiple of 32")
+if not 0 <= FOODSEG_TILE_OVERLAP < FOODSEG_TILE_SIZE:
+    raise RuntimeError("FOODSEG_TILE_OVERLAP must be smaller than FOODSEG_TILE_SIZE")
 OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -87,26 +92,71 @@ DENSITY_TABLE = json.loads((ROOT / "food_density.json").read_text(encoding="utf-
 
 
 def segmentation_summary(image: Image.Image) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
-    """Run 104-class semantic segmentation and summarize each predicted food mask."""
+    """Segment every original-resolution pixel using overlapping, non-resized tiles."""
     width, height = image.size
-    model_image = image.resize((SEGMENT_SIZE, SEGMENT_SIZE), Image.Resampling.BILINEAR)
-    pixels = np.asarray(model_image, dtype=np.float32) / 255.0
+    pixels = np.asarray(image, dtype=np.uint8)
     mean = np.asarray([0.485, 0.456, 0.406], dtype=np.float32)
     std = np.asarray([0.229, 0.224, 0.225], dtype=np.float32)
-    tensor = torch.from_numpy(((pixels - mean) / std).transpose(2, 0, 1)).unsqueeze(0).to(DEVICE)
+    tile_size = FOODSEG_TILE_SIZE
+    overlap = FOODSEG_TILE_OVERLAP
 
-    with torch.inference_mode():
-        logits = segmenter(tensor)
-        probabilities = torch.softmax(logits, dim=1)[0]
-        confidence, prediction = probabilities.max(dim=0)
-    pred = prediction.detach().cpu().numpy().astype(np.uint8)
-    confidence_map = confidence.detach().cpu().numpy()
-    pred = np.asarray(Image.fromarray(pred).resize((width, height), Image.Resampling.NEAREST))
-    confidence_map = np.asarray(
-        Image.fromarray(confidence_map.astype(np.float32), mode="F").resize(
-            (width, height), Image.Resampling.BILINEAR
-        ), dtype=np.float32
-    )
+    def tile_starts(length: int) -> list[int]:
+        if length <= tile_size:
+            return [0]
+        stride = tile_size - overlap
+        starts = list(range(0, length - tile_size + 1, stride))
+        final_start = length - tile_size
+        if starts[-1] != final_start:
+            starts.append(final_start)
+        return starts
+
+    def blend_weights(start: int, valid_length: int, full_length: int) -> np.ndarray:
+        weights = np.ones(valid_length, dtype=np.float32)
+        ramp_length = min(overlap, valid_length)
+        if ramp_length and start > 0:
+            weights[:ramp_length] = np.linspace(0.05, 1.0, ramp_length, dtype=np.float32)
+        if ramp_length and start + valid_length < full_length:
+            weights[-ramp_length:] = np.minimum(
+                weights[-ramp_length:],
+                np.linspace(1.0, 0.05, ramp_length, dtype=np.float32),
+            )
+        return weights
+
+    pred = np.zeros((height, width), dtype=np.uint8)
+    confidence_map = np.zeros((height, width), dtype=np.float32)
+    best_score = np.full((height, width), -1.0, dtype=np.float32)
+
+    for y in tile_starts(height):
+        valid_height = min(tile_size, height - y)
+        input_height = max(32, ((valid_height + 31) // 32) * 32)
+        y_weights = blend_weights(y, valid_height, height)
+        for x in tile_starts(width):
+            valid_width = min(tile_size, width - x)
+            input_width = max(32, ((valid_width + 31) // 32) * 32)
+            x_weights = blend_weights(x, valid_width, width)
+
+            tile = pixels[y:y + valid_height, x:x + valid_width].astype(np.float32) / 255.0
+            normalized = (tile - mean) / std
+            tensor_array = np.zeros((1, 3, input_height, input_width), dtype=np.float32)
+            tensor_array[0, :, :valid_height, :valid_width] = normalized.transpose(2, 0, 1)
+            tensor = torch.from_numpy(tensor_array).to(DEVICE)
+
+            with torch.inference_mode():
+                logits = segmenter(tensor)
+                probabilities = torch.softmax(logits, dim=1)[0, :, :valid_height, :valid_width]
+                confidence, prediction = probabilities.max(dim=0)
+
+            tile_pred = prediction.cpu().numpy().astype(np.uint8)
+            tile_conf = confidence.cpu().numpy().astype(np.float32)
+            tile_weight = y_weights[:, None] * x_weights[None, :]
+            score = tile_conf * tile_weight
+            score_region = best_score[y:y + valid_height, x:x + valid_width]
+            replace = score > score_region
+            pred_region = pred[y:y + valid_height, x:x + valid_width]
+            confidence_region = confidence_map[y:y + valid_height, x:x + valid_width]
+            pred_region[replace] = tile_pred[replace]
+            confidence_region[replace] = tile_conf[replace]
+            score_region[replace] = score[replace]
 
     areas: list[dict[str, Any]] = []
     detections: list[dict[str, Any]] = []
@@ -174,7 +224,6 @@ def detect_top_plate_scale(image: Image.Image, plate_diameter_cm: float, food_pi
         "food_footprint_cm2": round(footprint_cm2, 1),
         "method": "Hough circle estimate from top-view plate rim",
     }
-
 
 def parse_component_response(text: str, plate_diameter_cm: float) -> dict[str, Any]:
     text = text.strip()
@@ -281,12 +330,17 @@ async def health() -> dict[str, Any]:
         "segmenter_class_count": len(CLASS_NAMES),
         "segmenter_classes": list(CLASS_NAMES.values()),
         "segmenter_device": str(DEVICE),
+        "segmenter_input_mode": "native-resolution overlapping tiles",
+        "segmenter_tile_size": FOODSEG_TILE_SIZE,
+        "segmenter_tile_overlap": FOODSEG_TILE_OVERLAP,
+        "qwen_context_tokens": QWEN_NUM_CTX,
+        "max_image_pixels": MAX_IMAGE_PIXELS,
         "density_categories": list(DENSITY_TABLE),
         "qwen_model": QWEN_MODEL,
     }
 
 
-async def _read_food_image(upload: UploadFile, field_name: str) -> Image.Image:
+async def _read_food_image(upload: UploadFile, field_name: str) -> tuple[Image.Image, bytes]:
     if upload.content_type and not upload.content_type.startswith("image/"):
         raise HTTPException(status_code=415, detail=f"{field_name} must be an image")
     raw = await upload.read(MAX_IMAGE_BYTES + 1)
@@ -295,12 +349,21 @@ async def _read_food_image(upload: UploadFile, field_name: str) -> Image.Image:
     if len(raw) > MAX_IMAGE_BYTES:
         raise HTTPException(status_code=413, detail=f"{field_name} exceeds {MAX_IMAGE_BYTES} bytes")
     try:
-        image = Image.open(io.BytesIO(raw)).convert("RGB")
+        decoded = Image.open(io.BytesIO(raw))
+        if decoded.width * decoded.height > MAX_IMAGE_PIXELS:
+            raise HTTPException(
+                status_code=413,
+                detail=f"{field_name} exceeds the {MAX_IMAGE_PIXELS:,}-pixel safety limit; the API will not downscale it",
+            )
+        image = ImageOps.exif_transpose(decoded).convert("RGB")
+    except Image.DecompressionBombError:
+        raise HTTPException(
+            status_code=413,
+            detail=f"{field_name} exceeds the {MAX_IMAGE_PIXELS:,}-pixel safety limit; the API will not downscale it",
+        )
     except (UnidentifiedImageError, OSError):
         raise HTTPException(status_code=400, detail=f"Could not decode {field_name}")
-    if max(image.size) > MAX_SIDE:
-        image.thumbnail((MAX_SIDE, MAX_SIDE), Image.Resampling.LANCZOS)
-    return image
+    return image, raw
 
 
 @app.post("/vision")
@@ -312,8 +375,8 @@ async def vision(
     """Estimate ingredient weights from paired views and a known plate diameter."""
     if not 15 <= plate_diameter_cm <= 40:
         raise HTTPException(status_code=422, detail="plate_diameter_cm must be between 15 and 40 cm")
-    top = await _read_food_image(top_image, "top_image")
-    side = await _read_food_image(side_image, "side_image")
+    top, top_original_bytes = await _read_food_image(top_image, "top_image")
+    side, side_original_bytes = await _read_food_image(side_image, "side_image")
 
     started = time.perf_counter()
     top_areas, top_detections, top_food_pixels = segmentation_summary(top)
@@ -362,8 +425,8 @@ async def vision(
         "messages": [{
             "role": "user",
             "content": prompt,
-            "images": [base64.b64encode(_jpeg_bytes(top)).decode("ascii"),
-                       base64.b64encode(_jpeg_bytes(side)).decode("ascii")],
+            "images": [base64.b64encode(top_original_bytes).decode("ascii"),
+                       base64.b64encode(side_original_bytes).decode("ascii")],
         }],
         "stream": False,
         "think": False,
@@ -372,7 +435,7 @@ async def vision(
         "keep_alive": "10m",
     }
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=5.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(600.0, connect=5.0)) as client:
             response = await client.post(f"{OLLAMA_URL.rstrip('/')}/api/chat", json=payload)
             response.raise_for_status()
         ollama_result = response.json()
@@ -428,6 +491,12 @@ async def vision(
         "ingredients": ingredient_totals,
         "estimates": estimates,
         "scale_reference": {"plate_diameter_cm": plate_diameter_cm, **plate_scale},
+        "image_processing": {
+            "top_image_px": {"width": top.width, "height": top.height},
+            "side_image_px": {"width": side.width, "height": side.height},
+            "qwen_input": "original uploaded file bytes; no API resize, crop, or re-encode",
+            "segmentation_input": "native-resolution overlapping tiles; all original pixels are covered",
+        },
         "method": "Qwen estimates component volumes from two views; backend multiplies volume ranges by food-category density ranges.",
         "limitations": limitations,
         "segmentation": {
@@ -435,9 +504,3 @@ async def vision(
         "side_view": {"areas": side_areas, "detections": side_detections},
         },
     }
-
-
-def _jpeg_bytes(image: Image.Image) -> bytes:
-    output = io.BytesIO()
-    image.save(output, format="JPEG", quality=85, optimize=True)
-    return output.getvalue()
